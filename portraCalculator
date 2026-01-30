@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portra 400 Night Master</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #000; color: #e0e0e0; padding: 20px; display: flex; justify-content: center; }
+        .card { background: #1a1a1a; padding: 25px; border-radius: 16px; border: 1px solid #333; width: 100%; max-width: 400px; }
+        h2 { color: #ffcc00; margin-top: 0; text-align: center; font-size: 1.2em; letter-spacing: 1px; }
+        label { display: block; margin-bottom: 6px; font-weight: bold; font-size: 0.75em; color: #777; text-transform: uppercase; }
+        select { width: 100%; padding: 15px; margin-bottom: 20px; border: 1px solid #444; border-radius: 8px; background: #222; color: #ffcc00; font-size: 1.1em; cursor: pointer; -webkit-appearance: none; }
+        .btn-group { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
+        button { padding: 15px; border: none; border-radius: 8px; font-weight: bold; font-size: 1em; cursor: pointer; }
+        .calc-btn { background: #ffcc00; color: black; }
+        .clear-btn { background: #333; color: #999; }
+        .result-box { margin-top: 25px; padding: 20px; background: #222; border-radius: 10px; border-left: 5px solid #ffcc00; display: none; }
+        .val-big { color: #00ff88; font-size: 2.2em; font-weight: bold; display: block; margin: 5px 0; }
+        .val-small { color: #ffcc00; font-weight: bold; }
+        .stat-row { display: flex; justify-content: space-between; font-size: 0.9em; margin-top: 10px; }
+        .info { font-size: 0.7em; color: #555; text-align: center; margin-top: 20px; line-height: 1.4; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>PORTRA 400 NIGHT MASTER</h2>
+    
+    <label>Shadow Reading (1° Spot)</label>
+    <select id="shadowSelect"></select>
+
+    <label>Highlight Reading (1° Spot)</label>
+    <select id="highSelect"></select>
+
+    <div class="btn-group">
+        <button class="calc-btn" onclick="calculate()">CALCULATE</button>
+        <button class="clear-btn" onclick="clearAll()">CLEAR</button>
+    </div>
+
+    <div id="results" class="result-box">
+        <span style="font-size: 0.8em; color: #888;">FINAL EXPOSURE TIME:</span>
+        <span id="finalVal" class="val-big">0.0s</span>
+        
+        <div class="stat-row">
+            <span>Base (-2 stops):</span>
+            <span id="baseVal" class="val-small">0s</span>
+        </div>
+        <div class="stat-row">
+            <span>Contrast Range:</span>
+            <span id="stopDiff" class="val-small">0 stops</span>
+        </div>
+        <div id="recipNote" style="font-size: 0.75em; color: #ff6b6b; margin-top: 10px; font-style: italic;"></div>
+    </div>
+
+    <div class="info">
+        Portra 400 Reciprocity Curve Applied<br>
+        Shadows placed 2 stops darker than meter reading.
+    </div>
+</div>
+
+<script>
+// Function to generate the list of shutter speeds
+function getSpeeds() {
+    let s = [
+        { l: "1/8000", v: 1/8000 }, { l: "1/4000", v: 1/4000 }, { l: "1/2000", v: 1/2000 },
+        { l: "1/1000", v: 1/1000 }, { l: "1/500", v: 1/500 }, { l: "1/250", v: 1/250 },
+        { l: "1/125", v: 1/125 }, { l: "1/60", v: 1/60 }, { l: "1/30", v: 1/30 },
+        { l: "1/15", v: 1/15 }, { l: "1/8", v: 1/8 }, { l: "1/4", v: 1/4 },
+        { l: "1/2", v: 0.5 }, { l: "1\"", v: 1 }, { l: "2\"", v: 2 },
+        { l: "4\"", v: 4 }, { l: "8\"", v: 8 }, { l: "15\"", v: 15 },
+        { l: "30\"", v: 30 }, { l: "45\"", v: 45 }, { l: "60\"", v: 60 }
+    ];
+    
+    // Add 15-second increments from 75s up to 180s (3 minutes)
+    for (let i = 75; i <= 180; i += 15) {
+        let mins = Math.floor(i / 60);
+        let secs = i % 60;
+        let label = secs === 0 ? mins + "m" : mins + "m " + secs + "s";
+        s.push({ l: label, v: i });
+    }
+    return s;
+}
+
+function populate() {
+    const sSelect = document.getElementById('shadowSelect');
+    const hSelect = document.getElementById('highSelect');
+    const speeds = getSpeeds();
+    
+    const def = document.createElement('option');
+    def.text = "-- Select Speed --"; def.value = "";
+    sSelect.add(def.cloneNode(true)); hSelect.add(def);
+
+    speeds.forEach(sp => {
+        let o = document.createElement('option');
+        o.value = sp.v; o.text = sp.l;
+        sSelect.add(o.cloneNode(true)); hSelect.add(o);
+    });
+}
+
+function formatTime(totalSeconds) {
+    if (totalSeconds < 60) return totalSeconds.toFixed(1) + "s";
+    let m = Math.floor(totalSeconds / 60);
+    let s = Math.round(totalSeconds % 60);
+    return s === 0 ? m + "m" : m + "m " + s + "s";
+}
+
+function calculate() {
+    const tShad = parseFloat(document.getElementById('shadowSelect').value);
+    const tHigh = parseFloat(document.getElementById('highSelect').value);
+    
+    if (isNaN(tShad)) return;
+
+    // 1. Move 2 stops darker (Shadow Placement)
+    let tBase = tShad / 4;
+    document.getElementById('baseVal').innerText = formatTime(tBase);
+
+    // 2. Reciprocity Calculation
+    let tFinal = tBase;
+    let isRecip = false;
+    if (tBase > 1) {
+        tFinal = Math.pow(tBase, 1.35);
+        isRecip = true;
+    }
+    
+    document.getElementById('finalVal').innerText = formatTime(tFinal);
+    document.getElementById('recipNote').innerText = isRecip ? "+ Reciprocity Failure added" : "No adjustment needed (< 1s)";
+
+    // 3. Contrast Calculation
+    if (!isNaN(tHigh)) {
+        let diff = Math.log2(tShad / tHigh);
+        document.getElementById('stopDiff').innerText = diff.toFixed(1) + " stops";
+    }
+
+    document.getElementById('results').style.display = 'block';
+}
+
+function clearAll() {
+    document.getElementById('shadowSelect').selectedIndex = 0;
+    document.getElementById('highSelect').selectedIndex = 0;
+    document.getElementById('results').style.display = 'none';
+}
+
+populate();
+</script>
+</body>
+</html>
