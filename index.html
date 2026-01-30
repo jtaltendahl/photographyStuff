@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portra 400 Night Master</title>
+    <title>Film Night Master Pro</title>
     <style>
         body { font-family: -apple-system, sans-serif; background: #000; color: #e0e0e0; padding: 20px; display: flex; justify-content: center; }
         .card { background: #1a1a1a; padding: 25px; border-radius: 16px; border: 1px solid #333; width: 100%; max-width: 400px; }
         h2 { color: #ffcc00; margin-top: 0; text-align: center; font-size: 1.2em; letter-spacing: 1px; }
         label { display: block; margin-bottom: 6px; font-weight: bold; font-size: 0.75em; color: #777; text-transform: uppercase; }
         select { width: 100%; padding: 15px; margin-bottom: 20px; border: 1px solid #444; border-radius: 8px; background: #222; color: #ffcc00; font-size: 1.1em; cursor: pointer; -webkit-appearance: none; }
+        .film-select { border: 1px solid #ffcc00; background: #2d2d14; color: #fff; font-weight: bold; }
         .btn-group { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
         button { padding: 15px; border: none; border-radius: 8px; font-weight: bold; font-size: 1em; cursor: pointer; }
         .calc-btn { background: #ffcc00; color: black; }
@@ -24,8 +25,15 @@
 <body>
 
 <div class="card">
-    <h2>PORTRA 400 NIGHT MASTER</h2>
+    <h2>FILM NIGHT MASTER</h2>
     
+    <label>Select Film Stock</label>
+    <select id="filmSelect" class="film-select">
+        <option value="1.35">Kodak Portra 400</option>
+        <option value="1.53">Kodak Tri-X 400</option>
+        <option value="1.28">Kodak T-Max 400</option>
+    </select>
+
     <label>Shadow Reading (1° Spot)</label>
     <select id="shadowSelect"></select>
 
@@ -53,13 +61,12 @@
     </div>
 
     <div class="info">
-        Portra 400 Reciprocity Curve Applied<br>
-        Shadows placed 2 stops darker than meter reading.
+        Calculations include 2-stop shadow placement<br>
+        and film-specific reciprocity formulas.
     </div>
 </div>
 
 <script>
-// Function to generate the list of shutter speeds
 function getSpeeds() {
     let s = [
         { l: "1/8000", v: 1/8000 }, { l: "1/4000", v: 1/4000 }, { l: "1/2000", v: 1/2000 },
@@ -70,8 +77,6 @@ function getSpeeds() {
         { l: "4\"", v: 4 }, { l: "8\"", v: 8 }, { l: "15\"", v: 15 },
         { l: "30\"", v: 30 }, { l: "45\"", v: 45 }, { l: "60\"", v: 60 }
     ];
-    
-    // Add 15-second increments from 75s up to 180s (3 minutes)
     for (let i = 75; i <= 180; i += 15) {
         let mins = Math.floor(i / 60);
         let secs = i % 60;
@@ -85,7 +90,6 @@ function populate() {
     const sSelect = document.getElementById('shadowSelect');
     const hSelect = document.getElementById('highSelect');
     const speeds = getSpeeds();
-    
     const def = document.createElement('option');
     def.text = "-- Select Speed --"; def.value = "";
     sSelect.add(def.cloneNode(true)); hSelect.add(def);
@@ -97,33 +101,47 @@ function populate() {
     });
 }
 
-function formatTime(totalSeconds) {
-    if (totalSeconds < 60) return totalSeconds.toFixed(1) + "s";
-    let m = Math.floor(totalSeconds / 60);
-    let s = Math.round(totalSeconds % 60);
-    return s === 0 ? m + "m" : m + "m " + s + "s";
+// NEW: Function to convert decimals to standard camera fractions
+function formatTime(val) {
+    if (val >= 1) {
+        if (val < 60) return val.toFixed(1) + "s";
+        let m = Math.floor(val / 60);
+        let s = Math.round(val % 60);
+        return s === 0 ? m + "m" : m + "m " + s + "s";
+    }
+    
+    // For fractional seconds, find the closest standard shutter speed
+    const standardFractions = [2, 4, 8, 15, 30, 60, 125, 250, 500, 1000, 2000, 4000, 8000];
+    let denominator = 1 / val;
+    let closest = standardFractions.reduce((prev, curr) => 
+        Math.abs(curr - denominator) < Math.abs(prev - denominator) ? curr : prev
+    );
+    
+    return "1/" + closest;
 }
 
 function calculate() {
     const tShad = parseFloat(document.getElementById('shadowSelect').value);
     const tHigh = parseFloat(document.getElementById('highSelect').value);
+    const exponent = parseFloat(document.getElementById('filmSelect').value);
     
     if (isNaN(tShad)) return;
 
-    // 1. Move 2 stops darker (Shadow Placement)
+    // 1. Shadow Placement (-2 stops)
     let tBase = tShad / 4;
     document.getElementById('baseVal').innerText = formatTime(tBase);
 
-    // 2. Reciprocity Calculation
+    // 2. Reciprocity Logic
     let tFinal = tBase;
     let isRecip = false;
-    if (tBase > 1) {
-        tFinal = Math.pow(tBase, 1.35);
+
+    if (tBase >= 1) {
+        tFinal = Math.pow(tBase, exponent);
         isRecip = true;
     }
     
     document.getElementById('finalVal').innerText = formatTime(tFinal);
-    document.getElementById('recipNote').innerText = isRecip ? "+ Reciprocity Failure added" : "No adjustment needed (< 1s)";
+    document.getElementById('recipNote').innerText = isRecip ? "+ Reciprocity Applied" : "No adjustment needed";
 
     // 3. Contrast Calculation
     if (!isNaN(tHigh)) {
