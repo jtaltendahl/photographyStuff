@@ -10,6 +10,9 @@
         h2 { color: #ffcc00; margin-top: 0; text-align: center; font-size: 1.2em; letter-spacing: 1px; }
         label { display: block; margin-bottom: 6px; font-weight: bold; font-size: 0.75em; color: #777; text-transform: uppercase; }
         select { width: 100%; padding: 15px; margin-bottom: 20px; border: 1px solid #444; border-radius: 8px; background: #222; color: #ffcc00; font-size: 1.1em; cursor: pointer; -webkit-appearance: none; }
+        .eu-container { display: flex; align-items: center; background: #2d1414; padding: 10px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #4d1a1a; }
+        .eu-container input { margin-right: 10px; transform: scale(1.5); }
+        .eu-container span { font-size: 0.85em; font-weight: bold; color: #ff6b6b; }
         .film-select { border: 1px solid #ffcc00; background: #2d2d14; color: #fff; font-weight: bold; }
         .btn-group { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
         button { padding: 15px; border: none; border-radius: 8px; font-weight: bold; font-size: 1em; cursor: pointer; }
@@ -27,14 +30,19 @@
 <div class="card">
     <h2>FILM NIGHT MASTER</h2>
     
-    <label>Select Film Stock</label>
+    <label>Film Stock</label>
     <select id="filmSelect" class="film-select">
         <option value="1.35">Kodak Portra 400</option>
         <option value="1.53">Kodak Tri-X 400</option>
         <option value="1.28">Kodak T-Max 400</option>
     </select>
 
-    <label>Shadow Reading (1° Spot)</label>
+    <div class="eu-container">
+        <input type="checkbox" id="euToggle" onchange="toggleEU()">
+        <span>SHADOW IS "E.u." (Too Dark)</span>
+    </div>
+
+    <label id="shadLabel">Shadow Reading (1° Spot)</label>
     <select id="shadowSelect"></select>
 
     <label>Highlight Reading (1° Spot)</label>
@@ -50,58 +58,46 @@
         <span id="finalVal" class="val-big">0.0s</span>
         
         <div class="stat-row">
-            <span>Base (-2 stops):</span>
+            <span>Base Exposure:</span>
             <span id="baseVal" class="val-small">0s</span>
         </div>
         <div class="stat-row">
-            <span>Contrast Range:</span>
+            <span id="statLabel">Contrast Range:</span>
             <span id="stopDiff" class="val-small">0 stops</span>
         </div>
         <div id="recipNote" style="font-size: 0.75em; color: #ff6b6b; margin-top: 10px; font-style: italic;"></div>
     </div>
-
-    <div class="info">
-        Calculations include 2-stop shadow placement<br>
-        and film-specific reciprocity formulas.
-    </div>
 </div>
 
 <script>
-function getSpeeds() {
-    let s = [
-        { l: "1/8000", v: 1/8000 }, { l: "1/4000", v: 1/4000 }, { l: "1/2000", v: 1/2000 },
-        { l: "1/1000", v: 1/1000 }, { l: "1/500", v: 1/500 }, { l: "1/250", v: 1/250 },
-        { l: "1/125", v: 1/125 }, { l: "1/60", v: 1/60 }, { l: "1/30", v: 1/30 },
-        { l: "1/15", v: 1/15 }, { l: "1/8", v: 1/8 }, { l: "1/4", v: 1/4 },
-        { l: "1/2", v: 0.5 }, { l: "1\"", v: 1 }, { l: "2\"", v: 2 },
-        { l: "4\"", v: 4 }, { l: "8\"", v: 8 }, { l: "15\"", v: 15 },
-        { l: "30\"", v: 30 }, { l: "45\"", v: 45 }, { l: "60\"", v: 60 }
-    ];
-    for (let i = 75; i <= 180; i += 15) {
-        let mins = Math.floor(i / 60);
-        let secs = i % 60;
-        let label = secs === 0 ? mins + "m" : mins + "m " + secs + "s";
-        s.push({ l: label, v: i });
-    }
-    return s;
-}
+const speeds = [
+    { l: "1/8000", v: 1/8000 }, { l: "1/4000", v: 1/4000 }, { l: "1/2000", v: 1/2000 },
+    { l: "1/1000", v: 1/1000 }, { l: "1/500", v: 1/500 }, { l: "1/250", v: 1/250 },
+    { l: "1/125", v: 1/125 }, { l: "1/60", v: 1/60 }, { l: "1/30", v: 1/30 },
+    { l: "1/15", v: 1/15 }, { l: "1/8", v: 1/8 }, { l: "1/4", v: 1/4 },
+    { l: "1/2", v: 0.5 }, { l: "1\"", v: 1 }, { l: "2\"", v: 2 },
+    { l: "4\"", v: 4 }, { l: "8\"", v: 8 }, { l: "15\"", v: 15 },
+    { l: "30\"", v: 30 }, { l: "45\"", v: 45 }, { l: "60\"", v: 60 }
+];
 
 function populate() {
-    const sSelect = document.getElementById('shadowSelect');
-    const hSelect = document.getElementById('highSelect');
-    const speeds = getSpeeds();
-    const def = document.createElement('option');
-    def.text = "-- Select Speed --"; def.value = "";
-    sSelect.add(def.cloneNode(true)); hSelect.add(def);
-
+    const s = document.getElementById('shadowSelect');
+    const h = document.getElementById('highSelect');
     speeds.forEach(sp => {
         let o = document.createElement('option');
         o.value = sp.v; o.text = sp.l;
-        sSelect.add(o.cloneNode(true)); hSelect.add(o);
+        s.add(o.cloneNode(true)); h.add(o);
     });
 }
 
-// NEW: Function to convert decimals to standard camera fractions
+function toggleEU() {
+    const isEU = document.getElementById('euToggle').checked;
+    const shadSelect = document.getElementById('shadowSelect');
+    shadSelect.disabled = isEU;
+    shadSelect.style.opacity = isEU ? "0.3" : "1";
+    document.getElementById('shadLabel').style.opacity = isEU ? "0.3" : "1";
+}
+
 function formatTime(val) {
     if (val >= 1) {
         if (val < 60) return val.toFixed(1) + "s";
@@ -109,52 +105,43 @@ function formatTime(val) {
         let s = Math.round(val % 60);
         return s === 0 ? m + "m" : m + "m " + s + "s";
     }
-    
-    // For fractional seconds, find the closest standard shutter speed
-    const standardFractions = [2, 4, 8, 15, 30, 60, 125, 250, 500, 1000, 2000, 4000, 8000];
-    let denominator = 1 / val;
-    let closest = standardFractions.reduce((prev, curr) => 
-        Math.abs(curr - denominator) < Math.abs(prev - denominator) ? curr : prev
-    );
-    
+    const standard = [2, 4, 8, 15, 30, 60, 125, 250, 500, 1000];
+    let den = 1 / val;
+    let closest = standard.reduce((prev, curr) => Math.abs(curr - den) < Math.abs(prev - den) ? curr : prev);
     return "1/" + closest;
 }
 
 function calculate() {
-    const tShad = parseFloat(document.getElementById('shadowSelect').value);
+    const isEU = document.getElementById('euToggle').checked;
     const tHigh = parseFloat(document.getElementById('highSelect').value);
     const exponent = parseFloat(document.getElementById('filmSelect').value);
-    
-    if (isNaN(tShad)) return;
+    let tBase;
 
-    // 1. Shadow Placement (-2 stops)
-    let tBase = tShad / 4;
-    document.getElementById('baseVal').innerText = formatTime(tBase);
-
-    // 2. Reciprocity Logic
-    let tFinal = tBase;
-    let isRecip = false;
-
-    if (tBase >= 1) {
-        tFinal = Math.pow(tBase, exponent);
-        isRecip = true;
-    }
-    
-    document.getElementById('finalVal').innerText = formatTime(tFinal);
-    document.getElementById('recipNote').innerText = isRecip ? "+ Reciprocity Applied" : "No adjustment needed";
-
-    // 3. Contrast Calculation
-    if (!isNaN(tHigh)) {
+    if (isEU) {
+        // Highlight Anchor: Place highlight 2.5 stops ABOVE gray
+        // Math: Highlight Reading * 2^2.5 (approx 5.6x time)
+        tBase = tHigh * 5.65;
+        document.getElementById('statLabel').innerText = "Mode:";
+        document.getElementById('stopDiff').innerText = "Highlight Anchor";
+    } else {
+        const tShad = parseFloat(document.getElementById('shadowSelect').value);
+        tBase = tShad / 4; // Shadow Anchor: 2 stops below gray
         let diff = Math.log2(tShad / tHigh);
+        document.getElementById('statLabel').innerText = "Contrast Range:";
         document.getElementById('stopDiff').innerText = diff.toFixed(1) + " stops";
     }
 
+    let tFinal = tBase >= 1 ? Math.pow(tBase, exponent) : tBase;
+    
+    document.getElementById('baseVal').innerText = formatTime(tBase);
+    document.getElementById('finalVal').innerText = formatTime(tFinal);
+    document.getElementById('recipNote').innerText = tBase >= 1 ? "+ Reciprocity Applied" : "No adjustment needed";
     document.getElementById('results').style.display = 'block';
 }
 
 function clearAll() {
-    document.getElementById('shadowSelect').selectedIndex = 0;
-    document.getElementById('highSelect').selectedIndex = 0;
+    document.getElementById('euToggle').checked = false;
+    toggleEU();
     document.getElementById('results').style.display = 'none';
 }
 
